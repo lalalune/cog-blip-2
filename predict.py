@@ -1,6 +1,8 @@
 # Prediction interface for Cog ⚙️
 # https://github.com/replicate/cog/blob/main/docs/python.md
 import os
+import base64
+import io
 
 cache = "/src/weights/"
 os.environ["TORCH_HOME"] = "/src/weights/"
@@ -10,7 +12,7 @@ if not os.path.exists(cache):
     os.makedirs(cache)
 
 import torch
-from cog import BasePredictor, Input, Path
+from cog import BasePredictor, Input
 from lavis.models import load_model_and_preprocess
 from PIL import Image
 
@@ -29,7 +31,7 @@ class Predictor(BasePredictor):
 
     def predict(
         self,
-        image: Path = Input(description="Input image to query or caption"),
+        image: str = Input(description="Input base64 image string to query or caption"),
         caption: bool = Input(
             description="Select if you want to generate image captions instead of asking questions",
             default=False,
@@ -54,7 +56,13 @@ class Predictor(BasePredictor):
         ),
     ) -> str:
         """Run a single prediction on the model"""
-        raw_image = Image.open(image).convert("RGB")
+        # convert the base64 string to bytes
+        image_data = base64.b64decode(image)
+        # create a bytes stream for PIL
+        image_stream = io.BytesIO(image_data)
+        # load the image from the stream
+        raw_image = Image.open(image_stream).convert("RGB")
+
         image = self.vis_processors["eval"](raw_image).unsqueeze(0).to(self.device)
 
         if caption or question == "":
